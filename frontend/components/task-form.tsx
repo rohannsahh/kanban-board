@@ -31,7 +31,7 @@ const formSchema = z.object({
   title: z.string().min(2, {
     message: "Title must be at least 2 characters.",
   }),
-  description: z.string().optional(),
+  description: z.string().default(""),
   status: z.enum(["To Do", "In Progress", "Completed"]),
   priority: z.enum(["Low", "Medium", "High"]),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
