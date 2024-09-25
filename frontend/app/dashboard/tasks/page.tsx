@@ -1,3 +1,6 @@
+
+
+
 "use client"
 import axios from "axios"
 import { useEffect, useState } from "react"
@@ -61,6 +64,8 @@ export default function TasksPage() {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = useState({})
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null) 
+  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false)
 
   useEffect(() => {
     const fetchTask = async () => {
@@ -193,6 +198,8 @@ export default function TasksPage() {
       id: (tasks.length + 1).toString(),
     }
     setTasks([...tasks, task])
+    setIsAddTaskOpen(false)
+
   }
 
   const handleUpdateTask = (updatedTask: Task) => {
@@ -200,9 +207,21 @@ export default function TasksPage() {
     setEditingTask(null)
   }
 
-  const handleDeleteTask = (taskId: string) => {
-    setTasks(tasks.filter(task => task.id !== taskId))
-  }
+   const handleDeleteTask = async (taskId: string) => {
+    const token = localStorage.getItem('token');
+    
+    try {
+      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/deletetask/${taskId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      setTasks(tasks.filter(task => task.id !== taskId));
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
+  };
 
   return (
     <div className="w-full">
@@ -216,9 +235,9 @@ export default function TasksPage() {
           className="max-w-sm"
         />
         <div className="flex items-center space-x-2">
-        <Dialog>
+        <Dialog open={isAddTaskOpen} onOpenChange={setIsAddTaskOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={() => setIsAddTaskOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" /> Add Task
               </Button>
             </DialogTrigger>
@@ -229,7 +248,10 @@ export default function TasksPage() {
                   Create a new task for your project.
                 </DialogDescription>
               </DialogHeader>
-              <TaskForm onSubmit={handleAddTask} />
+              <TaskForm 
+              onSubmit={handleAddTask}
+              closeForm={() => setIsAddTaskOpen(false)} 
+                          />
             </DialogContent>
           </Dialog>
           <DropdownMenu>
@@ -282,52 +304,57 @@ export default function TasksPage() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
+  {table.getRowModel().rows?.length ? (
+    table.getRowModel().rows.map((row) => (
+      <TableRow
+        key={row.id}
+        data-state={row.getIsSelected() && "selected"}
+        onClick={() => setSelectedTask(row.original)} 
+        className="cursor-pointer" 
+      >
+        {row.getVisibleCells().map((cell) => (
+          <TableCell key={cell.id}>
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </TableCell>
+        ))}
+      </TableRow>
+    ))
+  ) : (
+    <TableRow>
+      <TableCell colSpan={columns.length} className="h-24 text-center">
+        No results.
+      </TableCell>
+    </TableRow>
+  )}
+</TableBody>
+
         </Table>
+       
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
+        
+   
+        {selectedTask && (
+        <div className="text-center">
+          <Dialog open={!!selectedTask} onOpenChange={() => setSelectedTask(null)} >
+          <DialogContent >
+            <DialogHeader>
+              <DialogTitle>Task Details</DialogTitle>
+             
+            </DialogHeader>
+            <div>
+              <p><strong>Title:</strong> {selectedTask.title}</p>
+              <p><strong>Description:</strong> {selectedTask.description}</p>
+              <p><strong>Status:</strong> {selectedTask.status}</p>
+              <p><strong>Priority:</strong> {selectedTask.priority}</p>
+              <p><strong>Due Date:</strong> {selectedTask.dueDate}</p>
+            </div>
+          </DialogContent>
+        </Dialog>
         </div>
-        <div className="space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-          </Button>
-        </div>
+
+        
+      )} 
       </div>
       {editingTask && (
       <Dialog open={!!editingTask} onOpenChange={() => setEditingTask(null)}>
@@ -335,22 +362,26 @@ export default function TasksPage() {
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>
             <DialogDescription>
-              Make changes to your task here. Click save when you're done.
+              Make changes to your task here. Click save when you&apos;re done.
             </DialogDescription>
           </DialogHeader>
           <TaskForm 
-            task={editingTask} 
-            onSubmit={(data) => {
-                if (data._id) {
-                    handleUpdateTask(data as Task) 
-                  } else {
-                    handleAddTask(data as Omit<Task, "._id">) 
-                  }
-            }} 
-          />
+              task={editingTask}
+              closeForm={() => setIsAddTaskOpen(false)} 
+
+              onSubmit={(data) => {
+                if (data.id) {
+                  handleUpdateTask(data as Task)
+                } else {
+                  handleAddTask(data as Omit<Task, ".id">)
+                }
+              } }        
+                 />
         </DialogContent>
       </Dialog>
     )}
+    
     </div>
+    
   )
 }

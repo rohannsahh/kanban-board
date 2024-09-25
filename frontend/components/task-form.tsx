@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -27,7 +26,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 
 const formSchema = z.object({
-    _id: z.string().optional(), 
+    id: z.string().optional(), 
 
   title: z.string().min(2, {
     message: "Title must be at least 2 characters.",
@@ -43,18 +42,18 @@ const formSchema = z.object({
 type TaskFormProps = {
   task?: z.infer<typeof formSchema>
   onSubmit: (data: z.infer<typeof formSchema>) => void
+  closeForm: () => void;
 }
 
-export function TaskForm({ task, onSubmit }: TaskFormProps) {
+export function TaskForm({ task, onSubmit,closeForm }: TaskFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const {toast} =useToast()
   const token = localStorage.getItem('token');
 
 
-  const form = useForm<z.infer<typeof formSchema> & { _id?: string }>({
+  const form = useForm<z.infer<typeof formSchema> & { id?: string }>({
     resolver: zodResolver(formSchema),
     defaultValues: task || {
-
       title: "",
       description: "",
       status: "To Do",
@@ -65,10 +64,13 @@ export function TaskForm({ task, onSubmit }: TaskFormProps) {
 
   async function handleSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
+
+    console.log("Submitting Task Form:", task, "Form Values:", values);
+
     try {
       if (task) {
         // Edit existing task
-        await editTask(task._id, values)
+        await editTask(task.id, values)
       } else {
         // Create new task
         await createTask(values)
@@ -77,6 +79,7 @@ export function TaskForm({ task, onSubmit }: TaskFormProps) {
       toast({
         title: task ? "Task updated successfully!" : "Task created successfully!",
       })
+      closeForm();
     } catch (error) {
       console.error("Error submitting task:", error)
       toast({
@@ -90,8 +93,9 @@ export function TaskForm({ task, onSubmit }: TaskFormProps) {
   }
   async function editTask(id: string| undefined, data: z.infer<typeof formSchema>) {
     if (!id) {
-        throw new Error("Task ID is required for updating a task")
-      }
+      throw new Error("Task ID is required for updating a task");
+    }
+  
 
     const response = await axios.put(
       `${process.env.NEXT_PUBLIC_API_URL}/updatetask/${id}`, 
